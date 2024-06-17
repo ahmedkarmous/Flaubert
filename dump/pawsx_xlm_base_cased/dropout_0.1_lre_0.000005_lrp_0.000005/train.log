@@ -1,0 +1,31 @@
+INFO - 06/13/24 15:15:36 - 0:00:00 - ============ Initialized logger ============
+INFO - 06/13/24 15:15:36 - 0:00:00 - batch_size: 8
+                                     command: python flue/flue_xnli.py --exp_name pawsx_xlm_base_cased --exp_id 'dropout_0.1_lre_0.000005_lrp_0.000005' --dump_path 'dump/' --model_path '/home/getalp/karmouah/pretrained_models/Flaubert/flaubert_base_cased_xlm/flaubert_base_cased_xlm.pth' --data_path '/home/getalp/karmouah/data/processed' --dropout '0.1' --transfer_tasks 'FR-PAWSX' --optimizer_e 'adam,lr=0.000005' --optimizer_p 'adam,lr=0.000005' --finetune_layers '0:_1' --batch_size 8 --n_epochs 10 --epoch_size '-1' --max_len 512 --max_vocab '-1' --exp_id "dropout_0.1_lre_0.000005_lrp_0.000005"
+                                     data_path: /home/getalp/karmouah/data/processed
+                                     debug_slurm: False
+                                     debug_train: False
+                                     dropout: 0.1
+                                     dump_path: dump/pawsx_xlm_base_cased/dropout_0.1_lre_0.000005_lrp_0.000005
+                                     epoch_size: -1
+                                     exp_id: dropout_0.1_lre_0.000005_lrp_0.000005
+                                     exp_name: pawsx_xlm_base_cased
+                                     finetune_layers: 0:_1
+                                     group_by_size: False
+                                     id2lang: {0: 'fr'}
+                                     lang2id: {'fr': 0}
+                                     max_batch_size: 0
+                                     max_len: 512
+                                     max_vocab: -1
+                                     min_count: 0
+                                     model_path: /home/getalp/karmouah/pretrained_models/Flaubert/flaubert_base_cased_xlm/flaubert_base_cased_xlm.pth
+                                     n_epochs: 10
+                                     n_langs: 1
+                                     optimizer_e: adam,lr=0.000005
+                                     optimizer_p: adam,lr=0.000005
+                                     tokens_per_batch: -1
+                                     transfer_tasks: ['FR-PAWSX']
+                                     weighted_training: False
+INFO - 06/13/24 15:15:36 - 0:00:00 - The experiment will be stored in dump/pawsx_xlm_base_cased/dropout_0.1_lre_0.000005_lrp_0.000005
+                                     
+INFO - 06/13/24 15:15:36 - 0:00:00 - Running command: python flue/flue_xnli.py --exp_name pawsx_xlm_base_cased --exp_id 'dropout_0.1_lre_0.000005_lrp_0.000005' --dump_path 'dump/' --model_path '/home/getalp/karmouah/pretrained_models/Flaubert/flaubert_base_cased_xlm/flaubert_base_cased_xlm.pth' --data_path '/home/getalp/karmouah/data/processed' --dropout '0.1' --transfer_tasks 'FR-PAWSX' --optimizer_e 'adam,lr=0.000005' --optimizer_p 'adam,lr=0.000005' --finetune_layers '0:_1' --batch_size 8 --n_epochs 10 --epoch_size '-1' --max_len 512 --max_vocab '-1'
+
