@@ -23,6 +23,8 @@ from xlm.model.memory import HashingMemory
 from xlm.trainer import SingleTrainer, EncDecTrainer
 from xlm.evaluation.evaluator import SingleEvaluator, EncDecEvaluator
 
+import mlflow
+import subprocess
 
 def get_parser():
     """
@@ -237,6 +239,11 @@ def get_parser():
 
 def main(params):
 
+    ######################### mlflow #########################
+    # Set experiment name
+    mlflow.set_experiment(params.exp_name)
+    ######################### mlflow #########################
+
     # Get starting time
     start = time.time()
     total_elapsed_time_until_now = 0
@@ -290,84 +297,116 @@ def main(params):
     
     # language model training
     for _ in range(params.max_epoch):
-        logger.info('Checking parameters - beginning of epoch: {:8f}'.format(sum(p.sum().item() for p in model.parameters())))
+        ######################### mlflow #########################
+        # Set run name (a run for every epoch)
+        run_name = f"epoch_{trainer.epoch+1}"
+        artifact_path = f"model_{trainer.epoch}"
+        with mlflow.start_run(run_name=run_name) as run:
+            # Log the model parameters
+            mlflow.log_params({
+                "emb_dim": params.emb_dim,
+                "n_layers": params.n_layers,
+                "n_heads": params.n_heads,
+                "dropout": params.dropout,
+                "attention_dropout": params.attention_dropout,
+                "gelu_activation": params.gelu_activation,
+                "batch_size": params.batch_size,
+                "bptt": params.bptt,
+                "optimizer": params.optimizer,
+                "epoch_size": params.epoch_size,
+                "max_epoch": params.max_epoch,
+                "fp16": params.fp16,
+                "accumulate_gradients": params.accumulate_gradients,
+                "word_mask_keep_rand": params.word_mask_keep_rand,
+                "word_pred": params.word_pred,
+            })
+        ######################### mlflow #########################
+            logger.info('Checking parameters - beginning of epoch: {:8f}'.format(sum(p.sum().item() for p in model.parameters())))
 
-        start = time.time()
+            start = time.time()       
 
-        logger.info("============ Starting epoch %i ... ============" % trainer.epoch)
+            logger.info("============ Starting epoch %i ... ============" % trainer.epoch)
 
-        trainer.n_sentences = 0
+            trainer.n_sentences = 0
 
-        while trainer.n_sentences < trainer.epoch_size:
+            while trainer.n_sentences < trainer.epoch_size:
 
-            # CLM steps
-            for lang1, lang2 in shuf_order(params.clm_steps, params):
-                trainer.clm_step(lang1, lang2, params.lambda_clm)
+                # CLM steps
+                for lang1, lang2 in shuf_order(params.clm_steps, params):
+                    trainer.clm_step(lang1, lang2, params.lambda_clm)
 
-            # MLM steps (also includes TLM if lang2 is not None)
-            for lang1, lang2 in shuf_order(params.mlm_steps, params):
-                trainer.mlm_step(lang1, lang2, params.lambda_mlm)
+                # MLM steps (also includes TLM if lang2 is not None)
+                for lang1, lang2 in shuf_order(params.mlm_steps, params):
+                    trainer.mlm_step(lang1, lang2, params.lambda_mlm)
 
-            # parallel classification steps
-            for lang1, lang2 in shuf_order(params.pc_steps, params):
-                trainer.pc_step(lang1, lang2, params.lambda_pc)
+                # parallel classification steps
+                for lang1, lang2 in shuf_order(params.pc_steps, params):
+                    trainer.pc_step(lang1, lang2, params.lambda_pc)
 
-            # denoising auto-encoder steps
-            for lang in shuf_order(params.ae_steps):
-                trainer.mt_step(lang, lang, params.lambda_ae)
+                # denoising auto-encoder steps
+                for lang in shuf_order(params.ae_steps):
+                    trainer.mt_step(lang, lang, params.lambda_ae)
 
-            # machine translation steps
-            for lang1, lang2 in shuf_order(params.mt_steps, params):
-                trainer.mt_step(lang1, lang2, params.lambda_mt)
+                # machine translation steps
+                for lang1, lang2 in shuf_order(params.mt_steps, params):
+                    trainer.mt_step(lang1, lang2, params.lambda_mt)
 
-            # back-translation steps
-            for lang1, lang2, lang3 in shuf_order(params.bt_steps):
-                trainer.bt_step(lang1, lang2, lang3, params.lambda_bt)
+                # back-translation steps
+                for lang1, lang2, lang3 in shuf_order(params.bt_steps):
+                    trainer.bt_step(lang1, lang2, lang3, params.lambda_bt)
 
-            trainer.iter()
+                trainer.iter()
 
-        logger.info("============ End of epoch %i ============" % trainer.epoch)
+            logger.info("============ End of epoch %i ============" % trainer.epoch)
 
-        # evaluate perplexity
-        # logger.info('Before scoring ...')
-        scores = evaluator.run_all_evals(trainer)
-        # logger.info('Finished scoring.')
+            # evaluate perplexity
+            # logger.info('Before scoring ...')
+            scores = evaluator.run_all_evals(trainer)
+            # logger.info('Finished scoring.')
 
-        # print / JSON log
-        for k, v in scores.items():
-            logger.info("%s -> %.6f" % (k, v))
-        if params.is_master:
-            logger.info("__log__:%s" % json.dumps(scores))
+            # print / JSON log
+            for k, v in scores.items():
+                logger.info("%s -> %.6f" % (k, v))
+            if params.is_master:
+                logger.info("__log__:%s" % json.dumps(scores))
 
-        # logger.info('Before saving model ...')
-        # end of epoch
-        trainer.save_best_model(scores)
-        trainer.save_periodic()
-        trainer.end_epoch(scores)
-        # logger.info('End saving model.')
+            # logger.info('Before saving model ...')
+            # end of epoch
+            trainer.save_best_model(scores)
+            trainer.save_periodic()
+            trainer.end_epoch(scores)
+            # logger.info('End saving model.')
 
-        # Compute elapsed time
-        elapsed_time_epoch = (time.time() - start) / 60.0
-        elapsed_time_last_three_epochs.append(elapsed_time_epoch)
-        total_elapsed_time_until_now += elapsed_time_epoch
-        est_avg_time_each_epoch = np.mean(np.array(elapsed_time_last_three_epochs))
+            ######################### mlflow #########################
+            # Log metrics
+            mlflow.log_metrics(scores)
+            # Log artifact
+            # mlflow.log_artifact(params.dump_path)
+            ######################### mlflow #########################
 
-        logger.info('total_elapsed_time_until_now = {:2f} (min)'.format(total_elapsed_time_until_now))
-        logger.info('elapsed_time_last_three_epochs = {}'.format(elapsed_time_last_three_epochs))
-        logger.info('est_avg_time_each_epoch = {:.2f} (min)'.format(est_avg_time_each_epoch))
-        logger.info('params.time_limit = {:2f} (min)'.format(params.time_limit))
-        logger.info('Checking parameters - end of epoch: {:8f}'.format(sum(p.sum().item() for p in model.parameters())))
 
-        # Check running time
-        if params.time_limit > 0:
-            # Estimated avg time for each epoch is computed using running time of previous epoch
-            if total_elapsed_time_until_now + est_avg_time_each_epoch  < params.time_limit:
-                logger.info('Total elapsed time including next epoch is estimated to be LESS than time limit.')
-                logger.info('CONTINUE TRAINING ...')
-            else:
-                logger.info('Total elapsed time including next epoch is estimated to be GREATER than time limit.')
-                logger.info('STOP TRAINING.')
-                return
+            # Compute elapsed time
+            elapsed_time_epoch = (time.time() - start) / 60.0
+            elapsed_time_last_three_epochs.append(elapsed_time_epoch)
+            total_elapsed_time_until_now += elapsed_time_epoch
+            est_avg_time_each_epoch = np.mean(np.array(elapsed_time_last_three_epochs))
+
+            logger.info('total_elapsed_time_until_now = {:2f} (min)'.format(total_elapsed_time_until_now))
+            logger.info('elapsed_time_last_three_epochs = {}'.format(elapsed_time_last_three_epochs))
+            logger.info('est_avg_time_each_epoch = {:.2f} (min)'.format(est_avg_time_each_epoch))
+            logger.info('params.time_limit = {:2f} (min)'.format(params.time_limit))
+            logger.info('Checking parameters - end of epoch: {:8f}'.format(sum(p.sum().item() for p in model.parameters())))
+
+            # Check running time
+            if params.time_limit > 0:
+                # Estimated avg time for each epoch is computed using running time of previous epoch
+                if total_elapsed_time_until_now + est_avg_time_each_epoch  < params.time_limit:
+                    logger.info('Total elapsed time including next epoch is estimated to be LESS than time limit.')
+                    logger.info('CONTINUE TRAINING ...')
+                else:
+                    logger.info('Total elapsed time including next epoch is estimated to be GREATER than time limit.')
+                    logger.info('STOP TRAINING.')
+                    return
 
 
 if __name__ == '__main__':
@@ -386,6 +425,17 @@ if __name__ == '__main__':
     # check parameters
     check_data_params(params)
     check_model_params(params)
+
+    ######################### mlflow #########################
+    # # Launching the mlflow server
+    # command = "mlflow server --host 127.0.0.1 --port 8080"
+    # try:
+    #     subprocess.run(command, shell=True, check=True)
+    # except subprocess.CalledProcessError as e:
+    #     print(f"Erreur lors de le lancement du serveur mlflow : {e}")
+    # Set tracking uri
+    mlflow.set_tracking_uri("http://127.0.0.1:9000")
+    ######################### mlflow #########################
 
     # run experiment
     main(params)
