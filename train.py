@@ -24,7 +24,6 @@ from xlm.trainer import SingleTrainer, EncDecTrainer
 from xlm.evaluation.evaluator import SingleEvaluator, EncDecEvaluator
 
 import mlflow
-import subprocess
 
 def get_parser():
     """
@@ -381,7 +380,7 @@ def main(params):
             # Log metrics
             mlflow.log_metrics(scores)
             # Log artifact
-            # mlflow.log_artifact(params.dump_path)
+            mlflow.log_artifact(params.dump_path, artifact_path=artifact_path)
             ######################### mlflow #########################
 
 
@@ -428,11 +427,14 @@ if __name__ == '__main__':
 
     ######################### mlflow #########################
     # # Launching the mlflow server
-    # command = "mlflow server --host 127.0.0.1 --port 8080"
-    # try:
-    #     subprocess.run(command, shell=True, check=True)
-    # except subprocess.CalledProcessError as e:
-    #     print(f"Erreur lors de le lancement du serveur mlflow : {e}")
+    command = "mlflow server --host 127.0.0.1 --port 9000 &"
+    try:
+        exit_code = os.system(command)
+        if exit_code != 0:
+            raise Exception(f"La commande a échoué avec le code de sortie {exit_code}")
+        print("Le serveur MLflow a été lancé avec succès.")
+    except Exception as e:
+        print(f"Erreur lors du lancement du serveur MLflow : {e}")
     # Set tracking uri
     mlflow.set_tracking_uri("http://127.0.0.1:9000")
     ######################### mlflow #########################
