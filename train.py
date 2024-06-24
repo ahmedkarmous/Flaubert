@@ -380,7 +380,7 @@ def main(params):
             # Log metrics
             mlflow.log_metrics(scores)
             # Log artifact
-            mlflow.log_artifact(params.dump_path, artifact_path=artifact_path)
+            #mlflow.log_artifact(params.dump_path, artifact_path=artifact_path)
             ######################### mlflow #########################
 
 
@@ -426,7 +426,7 @@ if __name__ == '__main__':
     check_model_params(params)
 
     ######################### mlflow #########################
-    # # Launching the mlflow server
+    # Launching the mlflow server
     command = "mlflow server --host 127.0.0.1 --port 9000 &"
     try:
         exit_code = os.system(command)
