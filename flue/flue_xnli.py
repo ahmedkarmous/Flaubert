@@ -22,6 +22,8 @@ from xlm.evaluation.flue import FLUE
 #from xlm.evaluation.flue_simple import FLUE_simpleHead
 from xlm.model.embedder import SentenceEmbedder
 
+import mlflow
+
 
 GLUE_TASKS = ['MNLI-m', 'MNLI-mm', 'QQP', 'QNLI', 'SST-2', 'CoLA', 'MRPC', 'RTE', 'STS-B', 'WNLI', 'AX_MNLI-m']
 XNLI_TASKS = ['XNLI']
@@ -119,12 +121,38 @@ glue = GLUE(embedder, scores, params)
 xnli = XNLI(embedder, scores, params)
 flue = FLUE(embedder, scores, params)
 
+######################### mlflow #########################
+# Set experiment name
+mlflow.set_experiment(params.exp_name)
+# Log the parameters 
+mlflow.log_params({
+    "transfer_tasks": params.transfer_tasks,
+    "model_path": params.model_path,
+    "max_len": params.max_len,
+    "batch_size": params.batch_size,
+    "finetune_layers": params.finetune_layers,
+    "dropout": params.dropout,
+    "optimizer_e": params.optimizer_e,
+    "optimizer_p": params.optimizer_p,
+    "n_epochs": params.n_epochs,
+})
+# Set tracking uri
+mlflow.set_tracking_uri("http://127.0.0.1:9000")
+######################### mlflow #########################
+
 # run
 for task in params.transfer_tasks:
-    if task in GLUE_TASKS:
-        glue.run(task)
-    if task in XNLI_TASKS:
-        xnli.run()
-    if task in FLUE_TASKS:
-        flue.run(task)
-
+    ######################### mlflow #########################
+    run_name = f"run_{task}"
+    with mlflow.start_run(run_name=run_name) as run:
+    ######################### mlflow #########################
+        if task in GLUE_TASKS:
+            glue.run(task)
+        if task in XNLI_TASKS:
+            xnli.run()
+        if task in FLUE_TASKS:
+            flue.run(task)
+            ######################### mlflow #########################
+            mlflow.log_metrics(flue.scores)
+            ######################### mlflow #########################
+        mlflow.end_run()
